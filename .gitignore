@@ -1,0 +1,12 @@
+.DS_Store
+Thumbs.db
+desktop.ini
+
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+vendor/
+composer.lock
