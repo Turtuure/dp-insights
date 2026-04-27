@@ -14,6 +14,15 @@ $breadcrumbs = [
 ];
 
 $insight       = [];
+// Empty translations + initial 0/3 coverage so the locale-cards component
+// renders three skeletal cards. The fi_FI card is active by default; the
+// JS reads its inputs as the seed when the user presses "Create".
+$translations  = [];
+$coverage      = [
+    'fi_FI' => ['filled' => 0, 'total' => 3],
+    'en_GB' => ['filled' => 0, 'total' => 3],
+    'sw_TZ' => ['filled' => 0, 'total' => 3],
+];
 $primary_label = 'Create';
 $show_delete   = false;
 $contentClass  = 'content--no-scroll';
@@ -23,7 +32,7 @@ ob_start();
 <div class="page-header">
     <div>
         <h1 class="page-header__title">New insight</h1>
-        <p class="page-header__subtitle">Fill in the fields and publish or schedule.</p>
+        <p class="page-header__subtitle">Pick a category, then add the Finnish translation. English &amp; Swahili can be added afterwards.</p>
     </div>
     <div>
         <a href="/backstage/insights" class="btn btn--outline">
@@ -39,7 +48,9 @@ ob_start();
     <?php include __DIR__ . '/../_form.php'; ?>
 </div>
 
+<link rel="stylesheet" href="/pages/backstage/shared/locale-cards.css">
 <link rel="stylesheet" href="/modules/insights/assets/backstage/insight-form.css">
+<script src="/pages/backstage/shared/locale-cards.js" defer></script>
 <script src="/modules/insights/assets/backstage/insight-form-page.js" defer></script>
 
 <?php
