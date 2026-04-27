@@ -74,18 +74,22 @@ final class SqlInsightRepositoryStatsTest extends MigrationTestCase
         self::assertSame(1, $stats['scheduled']['value']);
     }
 
-    public function test_featured_only_counts_already_published_featured(): void
+    public function test_featured_counts_all_featured_regardless_of_publish_state(): void
     {
+        // Featured is the editor's "highlight this" intent — it's independent
+        // of the publish lifecycle. A piece scheduled for next month but
+        // marked featured is still part of the featured count. See platform
+        // commit 2792734 for the original SQL fix that this test mirrors.
         $yesterday = date('Y-m-d', strtotime('-1 day'));
         $tomorrow  = date('Y-m-d', strtotime('+1 day'));
 
         $this->seedInsight('daems', 'f1', $yesterday, true);
-        $this->seedInsight('daems', 'f2', $tomorrow,  true);  // future-dated featured does NOT count
+        $this->seedInsight('daems', 'f2', $tomorrow,  true);
         $this->seedInsight('daems', 'np', $yesterday, false);
 
         $stats = $this->repo->statsForTenant($this->tenantId('daems'));
 
-        self::assertSame(1, $stats['featured']['value']);
+        self::assertSame(2, $stats['featured']['value']);
     }
 
     public function test_published_sparkline_has_exactly_30_entries_zero_filled(): void

@@ -6,6 +6,7 @@ namespace DaemsModule\Insights\Tests\Integration;
 
 use DaemsModule\Insights\Domain\Insight;
 use DaemsModule\Insights\Domain\InsightId;
+use DaemsModule\Insights\Domain\InsightRepositoryInterface;
 use Daems\Tests\Support\FrozenClock;
 use Daems\Tests\Support\KernelHarness;
 use PHPUnit\Framework\TestCase;
@@ -14,12 +15,17 @@ final class BackstageInsightStatsTest extends TestCase
 {
     private KernelHarness $h;
     private string $adminToken;
+    private InsightRepositoryInterface $insights;
 
     protected function setUp(): void
     {
         $this->h          = new KernelHarness(FrozenClock::at('2026-04-25T12:00:00Z'));
         $admin            = $this->h->seedUser('admin-stats@x.com', 'pass1234', 'admin');
         $this->adminToken = $this->h->tokenFor($admin);
+        // KernelHarness no longer exposes $h->insights directly (the binding
+        // moved into modules/insights/backend/bindings.test.php which the
+        // module registry boots). Resolve the same fake via the container.
+        $this->insights = $this->h->container->make(InsightRepositoryInterface::class);
     }
 
     public function test_returns_zero_stats_when_no_insights(): void
@@ -37,11 +43,15 @@ final class BackstageInsightStatsTest extends TestCase
 
     public function test_counts_published_and_scheduled_correctly(): void
     {
-        $today    = '2026-04-25';  // matches the FrozenClock date
-        $tomorrow = '2026-04-26';
+        // InMemory fake's statsForTenant() compares against PHP's real
+        // 'today' (FrozenClock isn't propagated into the fake), so anchor
+        // dates dynamically: today = past = published, tomorrow = future =
+        // scheduled. Avoids brittleness across calendar rollovers.
+        $today    = date('Y-m-d');
+        $tomorrow = date('Y-m-d', strtotime('+1 day'));
 
-        $this->h->insights->save($this->makeInsight('pub-a', $today, false));
-        $this->h->insights->save($this->makeInsight('sched-b', $tomorrow, false));
+        $this->insights->save($this->makeInsight('pub-a', $today, false));
+        $this->insights->save($this->makeInsight('sched-b', $tomorrow, false));
 
         $resp = $this->h->authedRequest('GET', '/api/v1/backstage/insights/stats', $this->adminToken);
         $body = json_decode($resp->body(), true);
