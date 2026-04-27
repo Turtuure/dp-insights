@@ -4,10 +4,20 @@ declare(strict_types=1);
 
 namespace DaemsModule\Insights\Domain;
 
+use Daems\Domain\Locale\EntityTranslationView;
+use Daems\Domain\Locale\SupportedLocale;
+use Daems\Domain\Locale\TranslationMap;
 use Daems\Domain\Tenant\TenantId;
 
 final class Insight
 {
+    public const TRANSLATABLE_FIELDS = ['title', 'excerpt', 'content'];
+
+    private readonly TranslationMap $translations;
+
+    /**
+     * @param string[] $tags
+     */
     public function __construct(
         private readonly InsightId $id,
         private readonly TenantId $tenantId,
@@ -23,7 +33,16 @@ final class Insight
         private readonly ?string $heroImage,
         private readonly array $tags,
         private readonly string $content,
-    ) {}
+        ?TranslationMap $translations = null,
+    ) {
+        $this->translations = $translations ?? new TranslationMap([
+            SupportedLocale::UI_DEFAULT => [
+                'title'   => $this->title,
+                'excerpt' => $this->excerpt,
+                'content' => $this->content,
+            ],
+        ]);
+    }
 
     public function id(): InsightId { return $this->id; }
     public function tenantId(): TenantId { return $this->tenantId; }
@@ -38,6 +57,17 @@ final class Insight
     public function readingTime(): int { return $this->readingTime; }
     public function excerpt(): string { return $this->excerpt; }
     public function heroImage(): ?string { return $this->heroImage; }
+    /** @return string[] */
     public function tags(): array { return $this->tags; }
     public function content(): string { return $this->content; }
+
+    public function translations(): TranslationMap
+    {
+        return $this->translations;
+    }
+
+    public function view(SupportedLocale $requested, SupportedLocale $fallback): EntityTranslationView
+    {
+        return $this->translations->view($requested, $fallback, self::TRANSLATABLE_FIELDS);
+    }
 }

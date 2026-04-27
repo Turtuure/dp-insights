@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DaemsModule\Insights\Domain;
 
+use Daems\Domain\Locale\SupportedLocale;
 use Daems\Domain\Tenant\TenantId;
 
 interface InsightRepositoryInterface
@@ -25,6 +26,20 @@ interface InsightRepositoryInterface
     public function save(Insight $insight): void;
 
     public function delete(InsightId $id, TenantId $tenantId): void;
+
+    /**
+     * Upsert a single locale translation row. Used by the per-locale save
+     * endpoint (POST /api/v1/backstage/insights/{id}/translations/{locale}).
+     *
+     * @param array{title?: string, excerpt?: string, content?: string} $fields
+     * @throws \DomainException When the insight does not exist in the given tenant.
+     */
+    public function saveTranslation(
+        TenantId $tenantId,
+        string $insightId,
+        SupportedLocale $locale,
+        array $fields,
+    ): void;
 
     /**
      * Aggregate stats for the backstage dashboard.
