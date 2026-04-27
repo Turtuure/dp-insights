@@ -8,7 +8,13 @@ use Daems\Domain\Tenant\TenantId;
 
 final class CreateInsightInput
 {
-    /** @param string[] $tags */
+    /**
+     * @param string[] $tags
+     *
+     * title, excerpt and content seed the fi_FI translation row written
+     * alongside the new chrome row. Additional locales (en_GB, sw_TZ) are
+     * added afterwards via UpdateInsightTranslation.
+     */
     public function __construct(
         public readonly TenantId $tenantId,
         public readonly string $slug,

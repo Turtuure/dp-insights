@@ -111,20 +111,20 @@ final class InsightBackstageController
 
         $body = $request->all();
         try {
+            // Chrome-only update. Title/excerpt/content are owned by
+            // UpdateInsightTranslation per locale and intentionally
+            // ignored here even if the legacy frontend sends them.
             $out = $this->updateInsight->execute(new UpdateInsightInput(
                 insightId:     InsightId::fromString($id),
                 tenantId:      $tenant->id,
                 slug:          self::bodyStr($body, 'slug'),
-                title:         self::bodyStr($body, 'title'),
                 category:      self::bodyStr($body, 'category'),
                 categoryLabel: self::bodyStr($body, 'category_label', self::bodyStr($body, 'category')),
                 featured:      self::bodyBool($body, 'featured'),
                 publishedDate: self::bodyNullableStr($body, 'published_date'),
                 author:        self::bodyStr($body, 'author'),
-                excerpt:       self::bodyStr($body, 'excerpt'),
                 heroImage:     self::bodyNullableStr($body, 'hero_image'),
                 tags:          self::bodyStringArray($body, 'tags'),
-                content:       self::bodyStr($body, 'content'),
             ));
         } catch (NotFoundException) {
             return Response::json(['error' => 'not_found'], 404);

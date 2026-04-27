@@ -37,9 +37,11 @@ final class UpdateInsightTest extends TestCase
         $repo = $this->fakeRepo($existing);
         $uc = new UpdateInsight($repo);
 
-        $out = $uc->execute($this->validInput(slug: 'same-slug', title: 'Updated title'));
-        self::assertSame('Updated title', $out->insight->title());
+        $out = $uc->execute($this->validInput(slug: 'same-slug', category: 'updated-cat'));
+        // Title comes from the existing translation map (unchanged by chrome update).
+        self::assertSame('Existing', $out->insight->title());
         self::assertSame('same-slug', $out->insight->slug());
+        self::assertSame('updated-cat', $out->insight->category());
     }
 
     public function test_rejects_slug_taken_by_another_insight(): void
@@ -61,29 +63,40 @@ final class UpdateInsightTest extends TestCase
         $repo = $this->fakeRepo($existing);
         $uc = new UpdateInsight($repo);
 
-        $out = $uc->execute($this->validInput(title: 'New title'));
+        $out = $uc->execute($this->validInput());
         self::assertSame(self::INSIGHT, $out->insight->id()->value());
+    }
+
+    public function test_chrome_update_preserves_translations(): void
+    {
+        $existing = $this->buildInsight();
+        $repo = $this->fakeRepo($existing);
+        $uc = new UpdateInsight($repo);
+
+        $out = $uc->execute($this->validInput(category: 'newcat'));
+
+        $rowFi = $out->insight->translations()->rowFor(SupportedLocale::uiDefault());
+        self::assertNotNull($rowFi);
+        self::assertSame('Existing', $rowFi['title']);
+        self::assertSame('newcat', $out->insight->category());
     }
 
     private function validInput(
         string $tenantId = self::TENANT_A,
         string $slug = 'original',
-        string $title = 'Hello',
+        string $category = 'tech',
     ): UpdateInsightInput {
         return new UpdateInsightInput(
             insightId: InsightId::fromString(self::INSIGHT),
             tenantId: TenantId::fromString($tenantId),
             slug: $slug,
-            title: $title,
-            category: 'tech',
-            categoryLabel: 'Tech',
+            category: $category,
+            categoryLabel: ucfirst($category),
             featured: false,
             publishedDate: '2026-04-24',
             author: 'Sam',
-            excerpt: 'Teaser',
             heroImage: null,
             tags: [],
-            content: '<p>body</p>',
         );
     }
 

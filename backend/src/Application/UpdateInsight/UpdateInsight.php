@@ -10,6 +10,12 @@ use DaemsModule\Insights\Domain\InsightRepositoryInterface;
 use Daems\Domain\Shared\NotFoundException;
 use Daems\Domain\Shared\ValidationException;
 
+/**
+ * Updates the chrome (non-translatable) fields of an Insight. Translations
+ * are managed separately via UpdateInsightTranslation. The existing
+ * TranslationMap on the entity is preserved on save() so this update never
+ * blanks an existing translation row.
+ */
 final class UpdateInsight
 {
     public function __construct(private readonly InsightRepositoryInterface $repo) {}
@@ -31,17 +37,22 @@ final class UpdateInsight
             id: $existing->id(),
             tenantId: $in->tenantId,
             slug: $in->slug,
-            title: $in->title,
+            title: $existing->title(),
             category: $in->category,
             categoryLabel: $in->categoryLabel,
             featured: $in->featured,
             date: CreateInsight::normalizeDateTime($in->publishedDate),
             author: $in->author,
-            readingTime: CreateInsight::computeReadingTime($in->content),
-            excerpt: $in->excerpt,
+            // reading_time tracks fi_FI body size, recomputed by
+            // UpdateInsightTranslation when the fi_FI translation changes.
+            // Keep the existing value here so chrome-only updates don't
+            // accidentally blank it.
+            readingTime: $existing->readingTime(),
+            excerpt: $existing->excerpt(),
             heroImage: $in->heroImage,
             tags: $in->tags,
-            content: $in->content,
+            content: $existing->content(),
+            translations: $existing->translations(),
         );
         $this->repo->save($updated);
 
@@ -51,21 +62,8 @@ final class UpdateInsight
     private function validate(UpdateInsightInput $in): void
     {
         $errors = [];
-        if (trim($in->title) === '') {
-            $errors['title'] = 'required';
-        } elseif (mb_strlen($in->title) > 255) {
-            $errors['title'] = 'too_long';
-        }
         if (trim($in->slug) === '') {
             $errors['slug'] = 'required';
-        }
-        if (trim($in->excerpt) === '') {
-            $errors['excerpt'] = 'required';
-        } elseif (mb_strlen($in->excerpt) > 500) {
-            $errors['excerpt'] = 'too_long';
-        }
-        if (trim($in->content) === '') {
-            $errors['content'] = 'required';
         }
         if (trim($in->category) === '') {
             $errors['category'] = 'required';
