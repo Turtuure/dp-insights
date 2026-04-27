@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 160" fill="currentColor" role="img" aria-label="No insights">
+  <style>.es-bg{fill:var(--surface-dark)}</style>
+  <!-- Document stack -->
+  <g opacity="0.18">
+    <rect x="46" y="36" width="100" height="92" rx="6" />
+  </g>
+  <g opacity="0.34">
+    <rect x="40" y="30" width="100" height="92" rx="6" />
+  </g>
+  <g>
+    <rect x="34" y="24" width="100" height="92" rx="6" fill="currentColor" opacity="0.6" />
+    <rect x="44" y="38" width="60" height="6" rx="2" class="es-bg" opacity="0.85" />
+    <rect x="44" y="50" width="80" height="4" rx="2" class="es-bg" opacity="0.55" />
+    <rect x="44" y="58" width="74" height="4" rx="2" class="es-bg" opacity="0.55" />
+    <rect x="44" y="66" width="56" height="4" rx="2" class="es-bg" opacity="0.55" />
+  </g>
+  <!-- Plus icon top-right -->
+  <g transform="translate(150, 36)">
+    <circle r="14" fill="currentColor" opacity="0.85"/>
+    <rect x="-8" y="-1.5" width="16" height="3" rx="1.5" class="es-bg"/>
+    <rect x="-1.5" y="-8" width="3" height="16" rx="1.5" class="es-bg"/>
+  </g>
+</svg>
