@@ -7,6 +7,8 @@ namespace DaemsModule\Insights\Infrastructure;
 use DaemsModule\Insights\Domain\Insight;
 use DaemsModule\Insights\Domain\InsightId;
 use DaemsModule\Insights\Domain\InsightRepositoryInterface;
+use Daems\Domain\Locale\SupportedLocale;
+use Daems\Domain\Locale\TranslationMap;
 use Daems\Domain\Tenant\TenantId;
 use Daems\Infrastructure\Framework\Database\Connection;
 
@@ -53,6 +55,8 @@ final class SqlInsightRepository implements InsightRepositoryInterface
 
     public function delete(InsightId $id, TenantId $tenantId): void
     {
+        // CASCADE on insights_i18n.fk_insights_i18n_insight removes the
+        // translation rows automatically.
         $this->db->execute(
             'DELETE FROM insights WHERE id = ? AND tenant_id = ?',
             [$id->value(), $tenantId->value()],
@@ -61,44 +65,90 @@ final class SqlInsightRepository implements InsightRepositoryInterface
 
     public function save(Insight $insight): void
     {
-        $searchText = trim((string) preg_replace('/\s+/', ' ', strip_tags($insight->content())));
+        // search_text is fi_FI-derived plain text. Pull from the supplied
+        // translation map's UI_DEFAULT row, falling back to the legacy
+        // scalar content() accessor so older callers keep working.
+        $fiRow         = $insight->translations()->rowFor(SupportedLocale::uiDefault()) ?? [];
+        $contentForSearch = isset($fiRow['content']) && is_string($fiRow['content']) && trim($fiRow['content']) !== ''
+            ? $fiRow['content']
+            : $insight->content();
+        $searchText = trim((string) preg_replace('/\s+/', ' ', strip_tags($contentForSearch)));
 
         $this->db->execute(
             'INSERT INTO insights
-                (id, tenant_id, slug, title, category, category_label, featured, published_date,
-                 author, reading_time, excerpt, hero_image, tags_json, content, search_text)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, tenant_id, slug, category, category_label, featured, published_date,
+                 author, reading_time, hero_image, tags_json, search_text)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
-                title          = VALUES(title),
                 category       = VALUES(category),
                 category_label = VALUES(category_label),
                 featured       = VALUES(featured),
                 published_date = VALUES(published_date),
                 author         = VALUES(author),
                 reading_time   = VALUES(reading_time),
-                excerpt        = VALUES(excerpt),
                 hero_image     = VALUES(hero_image),
                 tags_json      = VALUES(tags_json),
-                content        = VALUES(content),
                 search_text    = VALUES(search_text)',
             [
                 $insight->id()->value(),
                 $insight->tenantId()->value(),
                 $insight->slug(),
-                $insight->title(),
                 $insight->category(),
                 $insight->categoryLabel(),
                 $insight->featured() ? 1 : 0,
                 $insight->date(),
                 $insight->author(),
                 $insight->readingTime(),
-                $insight->excerpt(),
                 $insight->heroImage(),
                 json_encode($insight->tags()),
-                $insight->content(),
                 $searchText,
             ],
         );
+
+        // Persist any translation rows attached to the entity. On create
+        // this writes the seed fi_FI row; on subsequent saves it preserves
+        // every locale present in the map. Locales without a row are
+        // intentionally skipped so we never blank existing translations.
+        foreach ($insight->translations()->raw() as $locale => $row) {
+            if ($row === null || !SupportedLocale::isSupported($locale)) {
+                continue;
+            }
+            $this->upsertTranslationRow($insight->id()->value(), $locale, $row);
+        }
+    }
+
+    public function saveTranslation(
+        TenantId $tenantId,
+        string $insightId,
+        SupportedLocale $locale,
+        array $fields,
+    ): void {
+        $exists = $this->db->queryOne(
+            'SELECT 1 FROM insights WHERE id = ? AND tenant_id = ?',
+            [$insightId, $tenantId->value()],
+        );
+        if ($exists === null) {
+            throw new \DomainException('insight_not_found_in_tenant');
+        }
+        $title   = (string) ($fields['title']   ?? '');
+        $excerpt = (string) ($fields['excerpt'] ?? '');
+        $content = (string) ($fields['content'] ?? '');
+        $this->upsertTranslationRow($insightId, $locale->value(), [
+            'title'   => $title,
+            'excerpt' => $excerpt,
+            'content' => $content,
+        ]);
+
+        // When the saved locale is fi_FI we also refresh the convenience
+        // search_text (used by SqlSearchRepository::searchInsights as a
+        // plain-text fallback). Other locales leave search_text untouched.
+        if ($locale->value() === SupportedLocale::UI_DEFAULT) {
+            $plain = trim((string) preg_replace('/\s+/', ' ', strip_tags($content)));
+            $this->db->execute(
+                'UPDATE insights SET search_text = ? WHERE id = ? AND tenant_id = ?',
+                [$plain, $insightId, $tenantId->value()],
+            );
+        }
     }
 
     /**
@@ -234,21 +284,89 @@ final class SqlInsightRepository implements InsightRepositoryInterface
         $tags     = json_decode($tagsJson, true);
         $tags     = is_array($tags) ? $tags : [];
 
+        $insightId    = self::str($row, 'id');
+        $translations = $this->loadTranslationMap($insightId);
+
         return new Insight(
-            InsightId::fromString(self::str($row, 'id')),
-            TenantId::fromString(self::str($row, 'tenant_id')),
-            self::str($row, 'slug'),
-            self::str($row, 'title'),
-            self::str($row, 'category'),
-            self::str($row, 'category_label'),
-            (bool) ($row['featured'] ?? false),
-            self::strOrNull($row, 'published_date'),
-            self::str($row, 'author'),
-            self::intCol($row, 'reading_time'),
-            self::str($row, 'excerpt'),
-            self::strOrNull($row, 'hero_image'),
-            $tags,
-            self::str($row, 'content'),
+            id: InsightId::fromString($insightId),
+            tenantId: TenantId::fromString(self::str($row, 'tenant_id')),
+            slug: self::str($row, 'slug'),
+            title: self::firstAvailable($translations, 'title') ?? '',
+            category: self::str($row, 'category'),
+            categoryLabel: self::str($row, 'category_label'),
+            featured: (bool) ($row['featured'] ?? false),
+            date: self::strOrNull($row, 'published_date'),
+            author: self::str($row, 'author'),
+            readingTime: self::intCol($row, 'reading_time'),
+            excerpt: self::firstAvailable($translations, 'excerpt') ?? '',
+            heroImage: self::strOrNull($row, 'hero_image'),
+            tags: $tags,
+            content: self::firstAvailable($translations, 'content') ?? '',
+            translations: $translations,
+        );
+    }
+
+    /**
+     * Build TranslationMap from insights_i18n rows. After A11/insights-009
+     * insights_i18n is the sole source of truth — no legacy-column fallback.
+     */
+    private function loadTranslationMap(string $insightId): TranslationMap
+    {
+        $rows = $this->db->query(
+            'SELECT locale, title, excerpt, content FROM insights_i18n WHERE insight_id = ?',
+            [$insightId],
+        );
+        $map = [];
+        foreach (SupportedLocale::supportedValues() as $loc) {
+            $map[$loc] = null;
+        }
+        foreach ($rows as $r) {
+            $loc = isset($r['locale']) && is_string($r['locale']) ? $r['locale'] : null;
+            if ($loc === null || !SupportedLocale::isSupported($loc)) {
+                continue;
+            }
+            $map[$loc] = [
+                'title'   => isset($r['title'])   && is_string($r['title'])   ? $r['title']   : '',
+                'excerpt' => isset($r['excerpt']) && is_string($r['excerpt']) ? $r['excerpt'] : '',
+                'content' => isset($r['content']) && is_string($r['content']) ? $r['content'] : '',
+            ];
+        }
+        return new TranslationMap($map);
+    }
+
+    private static function firstAvailable(TranslationMap $translations, string $field): ?string
+    {
+        foreach ([SupportedLocale::UI_DEFAULT, SupportedLocale::CONTENT_FALLBACK] as $loc) {
+            $row = $translations->rowFor(SupportedLocale::fromString($loc));
+            if ($row !== null && isset($row[$field]) && trim((string) $row[$field]) !== '') {
+                return (string) $row[$field];
+            }
+        }
+        foreach (SupportedLocale::supportedValues() as $loc) {
+            $row = $translations->rowFor(SupportedLocale::fromString($loc));
+            if ($row !== null && isset($row[$field]) && trim((string) $row[$field]) !== '') {
+                return (string) $row[$field];
+            }
+        }
+        return null;
+    }
+
+    /** @param array<string, ?string> $row */
+    private function upsertTranslationRow(string $insightId, string $locale, array $row): void
+    {
+        $this->db->execute(
+            'INSERT INTO insights_i18n (insight_id, locale, title, excerpt, content)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                title=VALUES(title), excerpt=VALUES(excerpt),
+                content=VALUES(content), updated_at=CURRENT_TIMESTAMP',
+            [
+                $insightId,
+                $locale,
+                (string) ($row['title']   ?? ''),
+                (string) ($row['excerpt'] ?? ''),
+                (string) ($row['content'] ?? ''),
+            ],
         );
     }
 
