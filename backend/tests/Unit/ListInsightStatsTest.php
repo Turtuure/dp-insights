@@ -8,6 +8,7 @@ use DaemsModule\Insights\Application\ListInsightStats\ListInsightStatsInput;
 use DaemsModule\Insights\Domain\Insight;
 use DaemsModule\Insights\Domain\InsightId;
 use DaemsModule\Insights\Domain\InsightRepositoryInterface;
+use Daems\Domain\Locale\SupportedLocale;
 use Daems\Domain\Tenant\TenantId;
 use PHPUnit\Framework\TestCase;
 
@@ -22,6 +23,7 @@ final class ListInsightStatsTest extends TestCase
             public function findByIdForTenant(InsightId $id, TenantId $t): ?Insight { return null; }
             public function save(Insight $i): void {}
             public function delete(InsightId $id, TenantId $t): void {}
+            public function saveTranslation(TenantId $t, string $id, SupportedLocale $l, array $f): void {}
             public function statsForTenant(TenantId $t): array
             {
                 $this->captured = $t;
@@ -55,6 +57,7 @@ final class ListInsightStatsTest extends TestCase
             public function findByIdForTenant(InsightId $id, TenantId $t): ?Insight { return null; }
             public function save(Insight $i): void {}
             public function delete(InsightId $id, TenantId $t): void {}
+            public function saveTranslation(TenantId $t, string $id, SupportedLocale $l, array $f): void {}
             public function statsForTenant(TenantId $t): array { return $this->payload; }
         };
 

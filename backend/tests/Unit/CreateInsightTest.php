@@ -9,6 +9,7 @@ use DaemsModule\Insights\Application\CreateInsight\CreateInsightInput;
 use DaemsModule\Insights\Domain\Insight;
 use DaemsModule\Insights\Domain\InsightId;
 use DaemsModule\Insights\Domain\InsightRepositoryInterface;
+use Daems\Domain\Locale\SupportedLocale;
 use Daems\Domain\Shared\ValidationException;
 use Daems\Domain\Tenant\TenantId;
 use PHPUnit\Framework\TestCase;
@@ -129,6 +130,7 @@ final class CreateInsightTest extends TestCase
             public function findByIdForTenant(InsightId $id, TenantId $t): ?Insight { return null; }
             public function save(Insight $i): void { $this->saved[] = $i; }
             public function delete(InsightId $id, TenantId $t): void {}
+            public function saveTranslation(TenantId $t, string $id, SupportedLocale $l, array $f): void {}
             public function statsForTenant(TenantId $t): array { return ['published' => ['value' => 0, 'sparkline' => []], 'scheduled' => ['value' => 0, 'sparkline' => []], 'featured' => ['value' => 0, 'sparkline' => [], 'sparkline_scheduled' => []]]; }
         };
     }

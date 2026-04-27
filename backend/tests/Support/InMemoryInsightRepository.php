@@ -7,6 +7,8 @@ namespace DaemsModule\Insights\Tests\Support;
 use DaemsModule\Insights\Domain\Insight;
 use DaemsModule\Insights\Domain\InsightId;
 use DaemsModule\Insights\Domain\InsightRepositoryInterface;
+use Daems\Domain\Locale\SupportedLocale;
+use Daems\Domain\Locale\TranslationMap;
 use Daems\Domain\Tenant\TenantId;
 
 final class InMemoryInsightRepository implements InsightRepositoryInterface
@@ -14,10 +16,19 @@ final class InMemoryInsightRepository implements InsightRepositoryInterface
     /** @var array<string, Insight> */
     public array $bySlug = [];
 
+    /**
+     * @var array<string, array<string, array<string, string>>>
+     *      insightId => locale => [title, excerpt, content]
+     *
+     * Mirrors the SQL repo's insights_i18n table so unit/E2E callers get
+     * a faithful view from saveTranslation() + the rebuild-on-read path.
+     */
+    public array $translations = [];
+
     public function listForTenant(TenantId $tenantId, ?string $category = null, bool $includeUnpublished = false): array
     {
         return array_values(array_filter(
-            $this->bySlug,
+            array_map(fn(Insight $i): Insight => $this->withTranslations($i), $this->bySlug),
             static fn(Insight $i): bool => $i->tenantId()->equals($tenantId)
                 && ($category === null || $i->category() === $category),
         ));
@@ -29,14 +40,14 @@ final class InMemoryInsightRepository implements InsightRepositoryInterface
         if ($insight === null) {
             return null;
         }
-        return $insight->tenantId()->equals($tenantId) ? $insight : null;
+        return $insight->tenantId()->equals($tenantId) ? $this->withTranslations($insight) : null;
     }
 
     public function findByIdForTenant(InsightId $id, TenantId $tenantId): ?Insight
     {
         foreach ($this->bySlug as $insight) {
             if ($insight->id()->value() === $id->value() && $insight->tenantId()->equals($tenantId)) {
-                return $insight;
+                return $this->withTranslations($insight);
             }
         }
         return null;
@@ -45,16 +56,51 @@ final class InMemoryInsightRepository implements InsightRepositoryInterface
     public function save(Insight $insight): void
     {
         $this->bySlug[$insight->slug()] = $insight;
+        // Persist whatever locales the entity carried (mirroring the SQL
+        // repo: missing locales stay untouched, present ones are upserted).
+        foreach ($insight->translations()->raw() as $locale => $row) {
+            if ($row === null || !SupportedLocale::isSupported($locale)) {
+                continue;
+            }
+            $this->translations[$insight->id()->value()][$locale] = [
+                'title'   => (string) ($row['title']   ?? ''),
+                'excerpt' => (string) ($row['excerpt'] ?? ''),
+                'content' => (string) ($row['content'] ?? ''),
+            ];
+        }
     }
 
     public function delete(InsightId $id, TenantId $tenantId): void
     {
         foreach ($this->bySlug as $slug => $insight) {
             if ($insight->id()->value() === $id->value() && $insight->tenantId()->equals($tenantId)) {
-                unset($this->bySlug[$slug]);
+                unset($this->bySlug[$slug], $this->translations[$id->value()]);
                 return;
             }
         }
+    }
+
+    public function saveTranslation(
+        TenantId $tenantId,
+        string $insightId,
+        SupportedLocale $locale,
+        array $fields,
+    ): void {
+        $owner = null;
+        foreach ($this->bySlug as $insight) {
+            if ($insight->id()->value() === $insightId && $insight->tenantId()->equals($tenantId)) {
+                $owner = $insight;
+                break;
+            }
+        }
+        if ($owner === null) {
+            throw new \DomainException('insight_not_found_in_tenant');
+        }
+        $this->translations[$insightId][$locale->value()] = [
+            'title'   => (string) ($fields['title']   ?? ''),
+            'excerpt' => (string) ($fields['excerpt'] ?? ''),
+            'content' => (string) ($fields['content'] ?? ''),
+        ];
     }
 
     public function statsForTenant(TenantId $tenantId): array
@@ -117,6 +163,40 @@ final class InMemoryInsightRepository implements InsightRepositoryInterface
                 'sparkline_scheduled' => self::seriesFromMap($featuredScheduledDays),
             ],
         ];
+    }
+
+    /**
+     * Re-hydrate an Insight with its currently-stored translations map so
+     * tests that mutate translations via saveTranslation() see the change
+     * via subsequent find* calls.
+     */
+    private function withTranslations(Insight $insight): Insight
+    {
+        $stored = $this->translations[$insight->id()->value()] ?? [];
+        if ($stored === []) {
+            return $insight;
+        }
+        $map = [];
+        foreach (SupportedLocale::supportedValues() as $loc) {
+            $map[$loc] = $stored[$loc] ?? null;
+        }
+        return new Insight(
+            id: $insight->id(),
+            tenantId: $insight->tenantId(),
+            slug: $insight->slug(),
+            title: $insight->title(),
+            category: $insight->category(),
+            categoryLabel: $insight->categoryLabel(),
+            featured: $insight->featured(),
+            date: $insight->date(),
+            author: $insight->author(),
+            readingTime: $insight->readingTime(),
+            excerpt: $insight->excerpt(),
+            heroImage: $insight->heroImage(),
+            tags: $insight->tags(),
+            content: $insight->content(),
+            translations: new TranslationMap($map),
+        );
     }
 
     /**
