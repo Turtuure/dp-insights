@@ -16,12 +16,26 @@ if ($id === '') {
     exit;
 }
 
-// Server-side fetch so the form pre-fills synchronously (no flash of empty fields).
-$insight = ApiClient::get('/backstage/insights/' . rawurlencode($id));
+// Server-side fetch so the form pre-fills synchronously (no flash of empty
+// fields). After the i18n move we hit /translations to get chrome + per-locale
+// rows + coverage in one round-trip — same shape Projects uses.
+$insight = ApiClient::get('/backstage/insights/' . rawurlencode($id) . '/translations');
 if (!is_array($insight) || empty($insight)) {
     http_response_code(404);
     require DAEMS_SITE_PUBLIC . '/pages/errors/404.php';
     exit;
+}
+
+$translations = is_array($insight['translations'] ?? null) ? $insight['translations'] : [];
+$coverage     = is_array($insight['coverage']     ?? null) ? $insight['coverage']     : [];
+
+// Title for the page subheader: prefer fi_FI, then en_GB, then sw_TZ.
+$displayTitle = '(untitled)';
+foreach (['fi_FI', 'en_GB', 'sw_TZ'] as $loc) {
+    if (!empty($translations[$loc]['title'])) {
+        $displayTitle = (string) $translations[$loc]['title'];
+        break;
+    }
 }
 
 $pageTitle   = 'Edit insight';
@@ -35,7 +49,7 @@ $primary_label = 'Save';
 $show_delete   = true;
 $contentClass  = 'content--no-scroll';
 
-$titleSafe = htmlspecialchars((string) ($insight['title'] ?? '(untitled)'), ENT_QUOTES, 'UTF-8');
+$titleSafe = htmlspecialchars($displayTitle, ENT_QUOTES, 'UTF-8');
 $idSafe    = htmlspecialchars($id, ENT_QUOTES, 'UTF-8');
 
 ob_start();
@@ -59,7 +73,9 @@ ob_start();
     <?php include __DIR__ . '/../_form.php'; ?>
 </div>
 
+<link rel="stylesheet" href="/pages/backstage/shared/locale-cards.css">
 <link rel="stylesheet" href="/modules/insights/assets/backstage/insight-form.css">
+<script src="/pages/backstage/shared/locale-cards.js" defer></script>
 <script src="/modules/insights/assets/backstage/insight-form-page.js" defer></script>
 
 <?php
