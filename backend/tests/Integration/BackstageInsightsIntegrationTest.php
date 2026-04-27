@@ -69,39 +69,47 @@ final class BackstageInsightsIntegrationTest extends MigrationTestCase
         $id = $out->insight->id();
         self::assertSame(2, $out->insight->readingTime(), '400 words → ceil(400/200) = 2 min');
 
-        // Confirm in DB (search_text synced from global-search milestone hook)
-        $row = $this->pdo()->query("SELECT title, reading_time, search_text FROM insights WHERE id = '{$id->value()}'")
+        // Confirm chrome in DB (title now lives in insights_i18n; search_text
+        // is fi_FI-derived plain text, populated by save() at write time).
+        $row = $this->pdo()->query("SELECT reading_time, search_text FROM insights WHERE id = '{$id->value()}'")
             ->fetch(\PDO::FETCH_ASSOC);
-        self::assertSame('Lifecycle', $row['title']);
         self::assertSame(2, (int) $row['reading_time']);
         self::assertStringContainsString('word', (string) $row['search_text']);
+        $titleRow = $this->pdo()->query("SELECT title FROM insights_i18n WHERE insight_id = '{$id->value()}' AND locale = 'fi_FI'")
+            ->fetch(\PDO::FETCH_ASSOC);
+        self::assertSame('Lifecycle', $titleRow['title']);
 
-        // UPDATE
+        // UPDATE — chrome-only after the i18n refactor. Title/excerpt/content
+        // are owned by UpdateInsightTranslation and intentionally absent here.
         $update->execute(new UpdateInsightInput(
             insightId: $id,
             tenantId: $this->tenantA,
             slug: 'lifecycle-test',
-            title: 'Lifecycle Updated',
             category: 'tech',
             categoryLabel: 'Tech',
             featured: true,
             publishedDate: '2026-05-02',
             author: 'Sam',
-            excerpt: 'Teaser v2',
             heroImage: null,
             tags: ['a'],
-            content: '<p>short</p>',
         ));
 
-        $row = $this->pdo()->query("SELECT title, featured FROM insights WHERE id = '{$id->value()}'")
+        $row = $this->pdo()->query("SELECT featured FROM insights WHERE id = '{$id->value()}'")
             ->fetch(\PDO::FETCH_ASSOC);
-        self::assertSame('Lifecycle Updated', $row['title']);
         self::assertSame(1, (int) $row['featured']);
+
+        // Title remains unchanged on chrome-only update — translations are
+        // a separate API surface (UpdateInsightTranslation).
+        $titleRow = $this->pdo()->query("SELECT title FROM insights_i18n WHERE insight_id = '{$id->value()}' AND locale = 'fi_FI'")
+            ->fetch(\PDO::FETCH_ASSOC);
+        self::assertSame('Lifecycle', $titleRow['title']);
 
         // DELETE
         $delete->execute(new DeleteInsightInput($id, $this->tenantA));
         $count = (int) $this->pdo()->query("SELECT COUNT(*) FROM insights WHERE id = '{$id->value()}'")->fetchColumn();
         self::assertSame(0, $count);
+        $i18n = (int) $this->pdo()->query("SELECT COUNT(*) FROM insights_i18n WHERE insight_id = '{$id->value()}'")->fetchColumn();
+        self::assertSame(0, $i18n, 'CASCADE removes companion translations');
     }
 
     public function test_update_cross_tenant_throws_not_found(): void
@@ -130,16 +138,13 @@ final class BackstageInsightsIntegrationTest extends MigrationTestCase
             insightId: $out->insight->id(),
             tenantId: $this->tenantB,   // wrong tenant
             slug: 'cross-tenant',
-            title: 'Evil',
             category: 'tech',
             categoryLabel: 'Tech',
             featured: false,
             publishedDate: '2026-05-01',
             author: 'Sam',
-            excerpt: 'x',
             heroImage: null,
             tags: [],
-            content: 'body',
         ));
     }
 

@@ -31,20 +31,27 @@ final class SqlInsightRepositoryStatsTest extends MigrationTestCase
 
     private function seedInsight(string $tenantSlug, string $slug, string $publishedDate, bool $featured = false): void
     {
+        // Stats only read the chrome row (published_date / featured), so an
+        // i18n companion isn't strictly required for these assertions — but
+        // we add one anyway to keep the seeded fixture realistic post-009.
+        $insightId = Uuid7::generate()->value();
         $stmt = $this->pdo()->prepare(
             "INSERT INTO insights
-                (id, tenant_id, slug, title, category, category_label, featured, published_date,
-                 author, reading_time, excerpt, tags_json, content, created_at)
-             VALUES (?, (SELECT id FROM tenants WHERE slug = ?), ?, ?, 'c', 'C', ?, ?, 'a', 1, 'x', '[]', '<p>y</p>', NOW())"
+                (id, tenant_id, slug, category, category_label, featured, published_date,
+                 author, reading_time, tags_json, created_at)
+             VALUES (?, (SELECT id FROM tenants WHERE slug = ?), ?, 'c', 'C', ?, ?, 'a', 1, '[]', NOW())"
         );
         $stmt->execute([
-            Uuid7::generate()->value(),
+            $insightId,
             $tenantSlug,
             $slug,
-            'T-' . $slug,
             $featured ? 1 : 0,
             $publishedDate,
         ]);
+        $this->pdo()->prepare(
+            'INSERT INTO insights_i18n (insight_id, locale, title, excerpt, content)
+             VALUES (?, ?, ?, ?, ?)'
+        )->execute([$insightId, 'fi_FI', 'T-' . $slug, 'x', '<p>y</p>']);
     }
 
     private function tenantId(string $slug): \Daems\Domain\Tenant\TenantId

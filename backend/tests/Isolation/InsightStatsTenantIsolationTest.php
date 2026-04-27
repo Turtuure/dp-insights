@@ -27,20 +27,23 @@ final class InsightStatsTenantIsolationTest extends IsolationTestCase
 
     private function seedInsight(string $tenantSlug, string $slug, string $publishedDate, bool $featured): void
     {
-        $stmt = $this->pdo()->prepare(
+        $insightId = Uuid7::generate()->value();
+        $this->pdo()->prepare(
             "INSERT INTO insights
-                (id, tenant_id, slug, title, category, category_label, featured, published_date,
-                 author, reading_time, excerpt, content)
-             VALUES (?, (SELECT id FROM tenants WHERE slug = ?), ?, ?, 'c', 'C', ?, ?, 'a', 1, 'x', '<p>y</p>')"
-        );
-        $stmt->execute([
-            Uuid7::generate()->value(),
+                (id, tenant_id, slug, category, category_label, featured, published_date,
+                 author, reading_time)
+             VALUES (?, (SELECT id FROM tenants WHERE slug = ?), ?, 'c', 'C', ?, ?, 'a', 1)"
+        )->execute([
+            $insightId,
             $tenantSlug,
             $slug,
-            'T-' . $slug,
             $featured ? 1 : 0,
             $publishedDate,
         ]);
+        $this->pdo()->prepare(
+            'INSERT INTO insights_i18n (insight_id, locale, title, excerpt, content)
+             VALUES (?, ?, ?, ?, ?)'
+        )->execute([$insightId, 'fi_FI', 'T-' . $slug, 'x', '<p>y</p>']);
     }
 
     public function test_stats_isolate_published_count_by_tenant(): void

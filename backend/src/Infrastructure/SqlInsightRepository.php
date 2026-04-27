@@ -68,9 +68,10 @@ final class SqlInsightRepository implements InsightRepositoryInterface
         // search_text is fi_FI-derived plain text. Pull from the supplied
         // translation map's UI_DEFAULT row, falling back to the legacy
         // scalar content() accessor so older callers keep working.
-        $fiRow         = $insight->translations()->rowFor(SupportedLocale::uiDefault()) ?? [];
-        $contentForSearch = isset($fiRow['content']) && is_string($fiRow['content']) && trim($fiRow['content']) !== ''
-            ? $fiRow['content']
+        $fiRow            = $insight->translations()->rowFor(SupportedLocale::uiDefault()) ?? [];
+        $fiContent        = $fiRow['content'] ?? null;
+        $contentForSearch = is_string($fiContent) && trim($fiContent) !== ''
+            ? $fiContent
             : $insight->content();
         $searchText = trim((string) preg_replace('/\s+/', ' ', strip_tags($contentForSearch)));
 
@@ -281,8 +282,10 @@ final class SqlInsightRepository implements InsightRepositoryInterface
     {
         $tagsRaw  = $row['tags_json'] ?? null;
         $tagsJson = is_string($tagsRaw) ? $tagsRaw : '[]';
-        $tags     = json_decode($tagsJson, true);
-        $tags     = is_array($tags) ? $tags : [];
+        $tagsDecoded = json_decode($tagsJson, true);
+        $tags        = is_array($tagsDecoded)
+            ? array_values(array_filter($tagsDecoded, 'is_string'))
+            : [];
 
         $insightId    = self::str($row, 'id');
         $translations = $this->loadTranslationMap($insightId);
