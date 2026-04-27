@@ -97,6 +97,41 @@
     height: auto;
 }
 
+/* Locale-cards inside the left column take all remaining height so the
+   body textarea inside the active locale tab is the visible scroller. */
+.insight-form__locales {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+.insight-form__locales .locale-cards-editor {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+.insight-form__locales .locale-cards-fields {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: var(--space-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+.insight-form__locales .locale-cards-fields textarea {
+    /* Body textarea inside locale-cards uses the same monospace look. */
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    resize: vertical;
+}
+.insight-form__locales .locale-cards-actions {
+    flex-shrink: 0;
+}
+
 /* Actions footer in the right column: pin to the bottom, never scrolls. */
 .insight-form-panel--full-height .insight-form__col--right .insight-form__actions {
     flex-shrink: 0;
