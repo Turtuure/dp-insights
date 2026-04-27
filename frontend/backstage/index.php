@@ -70,7 +70,7 @@ ob_start();
   <!-- Empty / Error mount points -->
   <div id="insights-empty-mount" style="display:none;">
     <?php
-      $svg_path  = '/pages/backstage/insights/empty-state.svg';
+      $svg_path  = '/modules/insights/assets/backstage/empty-state.svg';
       $title     = 'No insights yet';
       $body      = 'Create your first insight to share news with members.';
       $cta_label = '+ Add insight';
@@ -81,7 +81,7 @@ ob_start();
   <div id="insights-error-mount" style="display:none;"></div>
 </div>
 
-<script src="/pages/backstage/insights/insight-panel.js" defer></script>
+<script src="/modules/insights/assets/backstage/insight-panel.js" defer></script>
 
 <?php
 $pageContent = ob_get_clean();

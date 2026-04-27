@@ -59,8 +59,8 @@ ob_start();
     <?php include __DIR__ . '/../_form.php'; ?>
 </div>
 
-<link rel="stylesheet" href="/pages/backstage/insights/insight-form.css">
-<script src="/pages/backstage/insights/insight-form-page.js" defer></script>
+<link rel="stylesheet" href="/modules/insights/assets/backstage/insight-form.css">
+<script src="/modules/insights/assets/backstage/insight-form-page.js" defer></script>
 
 <?php
 $pageContent = ob_get_clean();
