@@ -44,4 +44,4 @@ ob_start();
 
 <?php
 $pageContent = ob_get_clean();
-require __DIR__ . '/../../layout.php';
+require DAEMS_SITE_PUBLIC . '/pages/backstage/layout.php';

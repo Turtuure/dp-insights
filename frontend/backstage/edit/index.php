@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 if (!class_exists('ApiClient')) {
-    require_once __DIR__ . '/../../../../../src/ApiClient.php';
+    require_once DAEMS_SITE_PUBLIC . '/../src/ApiClient.php';
 }
 
 $u = $_SESSION['user'] ?? null;
@@ -20,7 +20,7 @@ if ($id === '') {
 $insight = ApiClient::get('/backstage/insights/' . rawurlencode($id));
 if (!is_array($insight) || empty($insight)) {
     http_response_code(404);
-    require __DIR__ . '/../../../errors/404.php';
+    require DAEMS_SITE_PUBLIC . '/pages/errors/404.php';
     exit;
 }
 
@@ -64,4 +64,4 @@ ob_start();
 
 <?php
 $pageContent = ob_get_clean();
-require __DIR__ . '/../../layout.php';
+require DAEMS_SITE_PUBLIC . '/pages/backstage/layout.php';

@@ -24,7 +24,7 @@
     </head>
     <body>
 
-        <?php include __DIR__ . '/../../partials/top-nav.php'; ?>
+        <?php include DAEMS_SITE_PUBLIC . '/partials/top-nav.php'; ?>
 
         <main>
             <?php include __DIR__ . '/detail/hero.php'; ?>
@@ -32,7 +32,7 @@
             <?php include __DIR__ . '/detail/related.php'; ?>
         </main>
 
-        <?php include __DIR__ . '/../../partials/footer.php'; ?>
+        <?php include DAEMS_SITE_PUBLIC . '/partials/footer.php'; ?>
 
         <script src="/assets/js/bootstrap.bundle.min.js"></script>
         <script src="/assets/js/daems.js"></script>
