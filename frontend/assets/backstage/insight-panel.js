@@ -20,10 +20,18 @@
     featured:  '#8b5cf6',
   };
 
+  // Per-card series labels surfaced in the sparkline tooltip.
+  var KPI_NAMES = {
+    published: 'Published',
+    scheduled: 'Scheduled',
+    featured:  'Featured',
+  };
+
   // Featured KPI is bi-temporal: past = published-featured (green),
   // future = scheduled-featured (blue). Matches published/scheduled hues so
   // the timeline reads as "what's been highlighted" + "what's queued".
   var FEATURED_SERIES_COLORS = ['#16a34a', '#3b82f6'];
+  var FEATURED_SERIES_NAMES  = ['Featured (published)', 'Featured (scheduled)'];
 
   var els = {
     tbody:       document.getElementById('insights-tbody'),
@@ -82,7 +90,7 @@
   }
   function initSpark(id, points) {
     var el = document.getElementById('spark-' + id);
-    if (el && window.Sparkline) window.Sparkline.init(el, points || [], KPI_COLORS[id]);
+    if (el && window.Sparkline) window.Sparkline.init(el, points || [], KPI_COLORS[id], KPI_NAMES[id]);
   }
   function initFeaturedSpark(featured) {
     var el = document.getElementById('spark-featured');
@@ -90,7 +98,8 @@
     window.Sparkline.init(
       el,
       [featured.sparkline || [], featured.sparkline_scheduled || []],
-      FEATURED_SERIES_COLORS
+      FEATURED_SERIES_COLORS,
+      FEATURED_SERIES_NAMES
     );
   }
 
