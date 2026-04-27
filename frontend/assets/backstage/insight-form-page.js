@@ -1,23 +1,24 @@
 /**
  * Insight create/edit sub-page handlers.
  *
- * Buttons:
- *   - Save     (#if-save)    — POST current form values; published_date may be null (= draft)
- *   - Publish  (#if-publish) — like Save, but auto-fills published_date with now if empty
- *   - Cancel   (anchor)      — only rendered in create-mode, navigates back
- *   - Delete   (#if-delete)  — only rendered in edit-mode, opens type-slug-to-confirm modal
- *
- * Publish date+time:
- *   - Visible: <input type="date" #if-publish-date> + <button #if-publish-time-btn>
- *   - Time button opens a Material-style clock-face TimePicker (12-hour + AM/PM)
- *   - Hidden #if-published-date stays in sync with combined 'Y-m-d H:i:00' value
- *     (this is the field the form submits)
- *
- * Slug auto-generation runs from Title until the user touches the slug field.
+ * After the i18n refactor:
+ *   - Translations (title, excerpt, content) are owned by the locale-cards
+ *     component (left column) — each card POSTs to
+ *       /api/v1/backstage/insights/{id}/translations/{locale}
+ *     via locale-cards.js. We just mount it.
+ *   - Chrome (slug, category, category_label, author, published_date,
+ *     featured) lives on the right column. The Save button POSTs chrome
+ *     to /api/backstage/insights.php?op=update; on create it sends both
+ *     chrome AND a fi_FI seed (so the new row has its first translation).
+ *   - Publish: same as Save but auto-fills published_date with NOW if empty.
+ *   - Delete: GitHub-style "type the slug to confirm" modal.
  *
  * Reads mode + id from the parent .insight-form-panel data attributes:
  *   data-mode        : 'create' | 'edit'
  *   data-insight-id  : present only when mode === 'edit'
+ *
+ * Pre-fill state for translations + coverage is bridged via window.DAEMS_INSIGHT_FORM
+ * (set by _form.php from the server-side fetch).
  */
 (function () {
     'use strict';
@@ -28,8 +29,12 @@
     var mode      = panel.getAttribute('data-mode') || 'create';
     var insightId = panel.getAttribute('data-insight-id') || '';
 
-    var titleEl       = document.getElementById('if-title');
+    var bridge = window.DAEMS_INSIGHT_FORM || { id: insightId, translations: {}, coverage: {} };
+
     var slugEl        = document.getElementById('if-slug');
+    var categoryEl    = document.getElementById('if-category');
+    var categoryLabel = document.getElementById('if-category-label');
+    var authorEl      = document.getElementById('if-author');
     var dateBtnEl     = document.getElementById('if-publish-date-btn');
     var dateDisplayEl = document.getElementById('if-publish-date-display');
     var timeBtnEl     = document.getElementById('if-publish-time-btn');
@@ -41,9 +46,7 @@
     var deleteBtn     = document.getElementById('if-delete');
     var errorEl       = document.getElementById('if-error-mount');
 
-    // Capture the slug as it was when the page loaded — that's the slug a
-    // delete modal must verify against. If the user has edited the slug in
-    // the form, we still want to confirm against the *live* (saved) one.
+    // Slug as it was when the page loaded — what the delete modal verifies.
     var originalSlug = slugEl ? slugEl.value.trim() : '';
 
     var labels = {
@@ -51,20 +54,62 @@
         publish: publishBtn ? publishBtn.textContent.trim() : '',
     };
 
-    // ── Slug auto-generation ────────────────────────────────────────────
-    var slugManuallyEdited = mode === 'edit' && originalSlug !== '';
+    // ── Locale-cards mount ──────────────────────────────────────────────
+    function mountLocaleCards() {
+        var container = panel.querySelector('.locale-cards-container');
+        if (!container || !window.LocaleCards) return;
+        window.LocaleCards.mount(container, {
+            kind:         'insight',
+            entityId:     bridge.id || '',
+            translations: bridge.translations || {},
+            coverage:     bridge.coverage || {
+                fi_FI: { filled: 0, total: 3 },
+                en_GB: { filled: 0, total: 3 },
+                sw_TZ: { filled: 0, total: 3 }
+            }
+        });
+    }
+    if (window.LocaleCards) {
+        mountLocaleCards();
+    } else {
+        // locale-cards.js is loaded with `defer`; if it hasn't parsed yet,
+        // defer until DOMContentLoaded / load.
+        document.addEventListener('DOMContentLoaded', mountLocaleCards);
+        window.addEventListener('load', mountLocaleCards);
+    }
 
+    // ── Read fi_FI draft for create-mode seed ───────────────────────────
+    function readFiFIDraft() {
+        var container = panel.querySelector('.locale-cards-container');
+        if (!container) return { title: '', excerpt: '', content: '' };
+        // The locale-cards component renders only the ACTIVE locale's fields
+        // in the DOM. On a fresh create page the active locale defaults to
+        // fi_FI, so reading the inputs gives us the seed we need.
+        var draft = { title: '', excerpt: '', content: '' };
+        container.querySelectorAll('.locale-cards-fields input, .locale-cards-fields textarea').forEach(function (i) {
+            draft[i.name] = i.value;
+        });
+        return draft;
+    }
+
+    // ── Slug auto-generation from fi_FI title ──────────────────────────
+    var slugManuallyEdited = mode === 'edit' && originalSlug !== '';
     if (slugEl) {
         slugEl.addEventListener('input', function () {
             slugManuallyEdited = true;
         });
     }
-    if (titleEl && slugEl) {
-        titleEl.addEventListener('input', function () {
-            if (slugManuallyEdited) return;
-            slugEl.value = slugify(titleEl.value);
-        });
-    }
+    // Watch the locale-cards title input (fi_FI only) and keep slug in sync.
+    document.addEventListener('input', function (e) {
+        if (slugManuallyEdited) return;
+        if (!(e.target instanceof HTMLInputElement)) return;
+        if (e.target.id !== 'lc-insight-title') return;
+        var container = panel.querySelector('.locale-cards-container');
+        if (!container) return;
+        var state = container._localeCardsState;
+        if (!state || state.activeLocale !== 'fi_FI') return;
+        if (slugEl) slugEl.value = slugify(e.target.value);
+    });
 
     function slugify(s) {
         if (!s) return '';
@@ -173,31 +218,18 @@
         deleteBtn.addEventListener('click', openDeleteModal);
     }
 
-    function val(name) {
-        var el = document.querySelector('#insight-form [name="' + name + '"]');
-        return el ? el.value : '';
-    }
-    function chk(name) {
-        var el = document.querySelector('#insight-form [name="' + name + '"]');
-        return !!(el && el.checked);
-    }
-
-    function buildPayload(action) {
+    function buildChromePayload(action) {
         if (action === 'publish' && !hasDateTime()) {
             setDateTimeNow();
         }
         syncHiddenDateTime();
-        var date = val('published_date') || null;
         return {
-            title:          val('title'),
-            slug:           val('slug'),
-            category:       val('category'),
-            category_label: val('category_label'),
-            author:         val('author'),
-            published_date: date,
-            excerpt:        val('excerpt'),
-            content:        val('content'),
-            featured:       chk('featured'),
+            slug:           slugEl        ? slugEl.value          : '',
+            category:       categoryEl    ? categoryEl.value      : '',
+            category_label: categoryLabel ? categoryLabel.value   : '',
+            author:         authorEl      ? authorEl.value        : '',
+            published_date: hiddenDtEl    ? (hiddenDtEl.value || null) : null,
+            featured:       !!(featuredEl && featuredEl.checked),
             hero_image:     null,
             tags:           [],
         };
@@ -229,10 +261,27 @@
         opts = opts || {};
         clearError();
 
-        var payload = buildPayload(opts.action);
-        if (!payload.title || !payload.slug) {
-            showError('Title and slug are required.');
+        var payload = buildChromePayload(opts.action);
+        if (!payload.slug) {
+            showError('Slug is required.');
             return;
+        }
+        if (!payload.category) {
+            showError('Category is required.');
+            return;
+        }
+
+        // On create we ALSO need a fi_FI seed (title + excerpt + content),
+        // because the platform CreateInsight expects them. Once the row is
+        // in the DB the user can fill en_GB / sw_TZ via the locale cards.
+        var draft = (mode === 'create') ? readFiFIDraft() : null;
+        if (mode === 'create') {
+            if ((draft.title   || '').trim().length < 3)  { showError('Title must be at least 3 characters (enter it under the Suomi card).'); return; }
+            if ((draft.excerpt || '').trim() === '')      { showError('Excerpt is required (enter it under the Suomi card).'); return; }
+            if ((draft.content || '').trim() === '')      { showError('Body is required (enter it under the Suomi card).'); return; }
+            payload.title   = draft.title.trim();
+            payload.excerpt = draft.excerpt.trim();
+            payload.content = draft.content.trim();
         }
 
         var url = mode === 'create'
@@ -254,7 +303,15 @@
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.json().catch(function () { return {}; });
             })
-            .then(function () {
+            .then(function (res) {
+                // Created — redirect to /edit so the user can fill en_GB+sw_TZ.
+                if (mode === 'create') {
+                    var newId = (res.data && (res.data.id || (res.data.data && res.data.data.id))) || '';
+                    if (newId) {
+                        window.location.href = '/backstage/insights/edit?id=' + encodeURIComponent(newId);
+                        return;
+                    }
+                }
                 window.location.href = '/backstage/insights';
             })
             .catch(function (e) {
@@ -281,8 +338,6 @@
         deleteModal.confirmBtn.disabled = true;
         deleteModal.backdrop.hidden = false;
         document.addEventListener('keydown', handleEsc);
-        // Focus after the next paint so the slide-in animation doesn't
-        // steal focus from the trigger button mid-animation.
         setTimeout(function () { deleteModal.input.focus(); }, 30);
     }
 
@@ -305,7 +360,6 @@
         backdrop.className = 'delete-modal-backdrop';
         backdrop.hidden = true;
         backdrop.addEventListener('click', function (e) {
-            // Click on the backdrop (not the inner modal) closes.
             if (e.target === backdrop) closeDeleteModal();
         });
 
@@ -393,7 +447,6 @@
             .catch(function (e) {
                 confirmBtn.textContent = 'Delete permanently';
                 cancelBtn.disabled = false;
-                // Re-enable confirm only if the input still matches.
                 if (deleteModal && deleteModal.input.value.trim() === originalSlug) {
                     confirmBtn.disabled = false;
                 }
@@ -402,10 +455,7 @@
             });
     }
 
-    // TimePicker lives in /shared/time-picker/time-picker.{css,js} —
-    // window.DaemsTimePicker.open(triggerEl, opts). The system24 preference
-    // is read from <meta name="daems-time-format"> (set by layout.php from
-    // /auth/me) and persisted via /api/me/time-format on toggle.
+    // TimePicker / DatePicker wiring helpers (unchanged from pre-i18n).
     function getTimeFormat() {
         var m = document.querySelector('meta[name="daems-time-format"]');
         var v = m && m.getAttribute('content');
@@ -420,7 +470,4 @@
             body:    JSON.stringify({ time_format: fmt }),
         }).catch(function () { /* silent */ });
     }
-
-    // DatePicker lives in /shared/date-picker/date-picker.{css,js} —
-    // window.DaemsDatePicker.open(triggerEl, opts) wired in dateBtnEl handler above.
 })();
