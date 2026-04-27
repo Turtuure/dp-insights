@@ -45,11 +45,11 @@ return function (Container $container): void {
     $container->bind(InsightBackstageController::class,
         static fn(Container $c) => new InsightBackstageController(
             $c->make(ListInsights::class),
-            $c->make(GetInsight::class),
             $c->make(CreateInsight::class),
             $c->make(UpdateInsight::class),
             $c->make(DeleteInsight::class),
             $c->make(ListInsightStats::class),
+            $c->make(InsightRepositoryInterface::class),
         ),
     );
 };
