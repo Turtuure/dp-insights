@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 use Daems\Infrastructure\Framework\Container\Container;
 use Daems\Infrastructure\Framework\Database\Connection;
+use DaemsModule\Insights\Application\Backstage\GetInsightWithAllTranslations\GetInsightWithAllTranslations;
+use DaemsModule\Insights\Application\Backstage\UpdateInsightTranslation\UpdateInsightTranslation;
 use DaemsModule\Insights\Application\CreateInsight\CreateInsight;
 use DaemsModule\Insights\Application\DeleteInsight\DeleteInsight;
 use DaemsModule\Insights\Application\GetInsight\GetInsight;
@@ -36,6 +38,12 @@ return function (Container $container): void {
     $container->bind(ListInsightStats::class,
         static fn(Container $c) => new ListInsightStats($c->make(InsightRepositoryInterface::class)),
     );
+    $container->bind(GetInsightWithAllTranslations::class,
+        static fn(Container $c) => new GetInsightWithAllTranslations($c->make(InsightRepositoryInterface::class)),
+    );
+    $container->bind(UpdateInsightTranslation::class,
+        static fn(Container $c) => new UpdateInsightTranslation($c->make(InsightRepositoryInterface::class)),
+    );
     $container->bind(InsightController::class,
         static fn(Container $c) => new InsightController(
             $c->make(ListInsights::class),
@@ -50,6 +58,8 @@ return function (Container $container): void {
             $c->make(DeleteInsight::class),
             $c->make(ListInsightStats::class),
             $c->make(InsightRepositoryInterface::class),
+            $c->make(GetInsightWithAllTranslations::class),
+            $c->make(UpdateInsightTranslation::class),
         ),
     );
 };

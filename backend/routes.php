@@ -44,4 +44,14 @@ return function (Router $router, Container $container): void {
     $router->post('/api/v1/backstage/insights/{id}/delete', static function (Request $req, array $params) use ($container): Response {
         return $container->make(InsightBackstageController::class)->delete($req, $params);
     }, [TenantContextMiddleware::class, AuthMiddleware::class]);
+
+    // i18n: backstage editor pre-fill + per-locale upsert. Mirrors
+    // /backstage/projects/{id}/translations[/{locale}] pattern.
+    $router->get('/api/v1/backstage/insights/{id}/translations', static function (Request $req, array $params) use ($container): Response {
+        return $container->make(InsightBackstageController::class)->getWithTranslations($req, $params);
+    }, [TenantContextMiddleware::class, AuthMiddleware::class]);
+
+    $router->post('/api/v1/backstage/insights/{id}/translations/{locale}', static function (Request $req, array $params) use ($container): Response {
+        return $container->make(InsightBackstageController::class)->updateTranslation($req, $params);
+    }, [TenantContextMiddleware::class, AuthMiddleware::class]);
 };

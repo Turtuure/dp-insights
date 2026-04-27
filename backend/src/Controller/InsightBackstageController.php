@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace DaemsModule\Insights\Controller;
 
+use DaemsModule\Insights\Application\Backstage\GetInsightWithAllTranslations\GetInsightWithAllTranslations;
+use DaemsModule\Insights\Application\Backstage\GetInsightWithAllTranslations\GetInsightWithAllTranslationsInput;
+use DaemsModule\Insights\Application\Backstage\UpdateInsightTranslation\UpdateInsightTranslation;
+use DaemsModule\Insights\Application\Backstage\UpdateInsightTranslation\UpdateInsightTranslationInput;
 use DaemsModule\Insights\Application\CreateInsight\CreateInsight;
 use DaemsModule\Insights\Application\CreateInsight\CreateInsightInput;
 use DaemsModule\Insights\Application\DeleteInsight\DeleteInsight;
@@ -18,6 +22,7 @@ use DaemsModule\Insights\Domain\Insight;
 use DaemsModule\Insights\Domain\InsightId;
 use DaemsModule\Insights\Domain\InsightRepositoryInterface;
 use Daems\Domain\Auth\ForbiddenException;
+use Daems\Domain\Locale\InvalidLocaleException;
 use Daems\Domain\Shared\NotFoundException;
 use Daems\Domain\Shared\ValidationException;
 use Daems\Domain\Tenant\Tenant;
@@ -33,6 +38,8 @@ final class InsightBackstageController
         private readonly DeleteInsight $deleteInsight,
         private readonly ListInsightStats $listInsightStats,
         private readonly InsightRepositoryInterface $insightRepo,
+        private readonly GetInsightWithAllTranslations $getWithTranslations,
+        private readonly UpdateInsightTranslation $updateTranslation,
     ) {}
 
     public function list(Request $request): Response
@@ -166,6 +173,66 @@ final class InsightBackstageController
         ));
 
         return Response::json(['data' => $out->stats]);
+    }
+
+    /**
+     * GET /api/v1/backstage/insights/{id}/translations
+     *
+     * Returns chrome metadata + per-locale translation rows + coverage,
+     * ready to populate the locale-cards backstage editor.
+     *
+     * @param array<string, string> $params
+     */
+    public function getWithTranslations(Request $request, array $params): Response
+    {
+        $tenant = $this->requireTenant($request);
+        $actor  = $request->requireActingUser();
+        $id     = (string) ($params['id'] ?? '');
+        if ($id === '') {
+            return Response::json(['error' => 'invalid_id'], 400);
+        }
+        try {
+            $out = $this->getWithTranslations->execute(
+                new GetInsightWithAllTranslationsInput($tenant->id, $id, $actor),
+            );
+        } catch (ForbiddenException) {
+            return Response::json(['error' => 'forbidden'], 403);
+        } catch (NotFoundException) {
+            return Response::json(['error' => 'not_found'], 404);
+        }
+        return Response::json(['data' => $out->insight]);
+    }
+
+    /**
+     * POST /api/v1/backstage/insights/{id}/translations/{locale}
+     *
+     * Upserts a single locale's title/excerpt/content row. Request body:
+     * { title, excerpt, content }. Response carries the new coverage map.
+     *
+     * @param array<string, string> $params
+     */
+    public function updateTranslation(Request $request, array $params): Response
+    {
+        $tenant    = $this->requireTenant($request);
+        $actor     = $request->requireActingUser();
+        $id        = (string) ($params['id']     ?? '');
+        $localeRaw = (string) ($params['locale'] ?? '');
+        $body      = $request->all();
+
+        try {
+            $out = $this->updateTranslation->execute(
+                new UpdateInsightTranslationInput($tenant->id, $id, $localeRaw, $body, $actor),
+            );
+        } catch (ForbiddenException) {
+            return Response::json(['error' => 'forbidden'], 403);
+        } catch (InvalidLocaleException) {
+            return Response::json(['error' => 'invalid_locale'], 400);
+        } catch (NotFoundException) {
+            return Response::json(['error' => 'not_found'], 404);
+        } catch (\DomainException $e) {
+            return Response::json(['error' => $e->getMessage()], 400);
+        }
+        return Response::json(['data' => ['coverage' => $out->coverage]]);
     }
 
     private function requireInsightsAdmin(Request $request, Tenant $tenant): void
