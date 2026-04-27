@@ -2,7 +2,6 @@
 declare(strict_types=1);
 
 use Daems\Infrastructure\Framework\Container\Container;
-use Daems\Infrastructure\Framework\Database\Connection;
 use DaemsModule\Insights\Application\CreateInsight\CreateInsight;
 use DaemsModule\Insights\Application\DeleteInsight\DeleteInsight;
 use DaemsModule\Insights\Application\GetInsight\GetInsight;
@@ -12,11 +11,11 @@ use DaemsModule\Insights\Application\UpdateInsight\UpdateInsight;
 use DaemsModule\Insights\Controller\InsightBackstageController;
 use DaemsModule\Insights\Controller\InsightController;
 use DaemsModule\Insights\Domain\InsightRepositoryInterface;
-use DaemsModule\Insights\Infrastructure\SqlInsightRepository;
+use DaemsModule\Insights\Tests\Support\InMemoryInsightRepository;
 
 return function (Container $container): void {
     $container->singleton(InsightRepositoryInterface::class,
-        static fn(Container $c) => new SqlInsightRepository($c->make(Connection::class)),
+        static fn() => new InMemoryInsightRepository(),
     );
     $container->bind(ListInsights::class,
         static fn(Container $c) => new ListInsights($c->make(InsightRepositoryInterface::class)),
