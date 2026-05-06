@@ -55,4 +55,4 @@ ob_start();
 
 <?php
 $pageContent = ob_get_clean();
-require DAEMS_SITE_PUBLIC . '/pages/backstage/layout.php';
+require DAEMS_SITE_PUBLIC . '/pages/layout.php';
