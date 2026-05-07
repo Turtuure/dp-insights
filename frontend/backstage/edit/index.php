@@ -36,7 +36,7 @@ foreach (['fi_FI', 'en_GB', 'sw_TZ'] as $loc) {
     }
 }
 
-$pageTitle   = 'Edit insight';
+$pageTitle   = 'backstage.title.insights_edit';
 $activePage  = 'insights';
 $breadcrumbs = [
     ['label' => 'Insights', 'url' => '/backstage/insights'],
