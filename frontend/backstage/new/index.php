@@ -6,7 +6,7 @@ $isAdmin = $u && (!empty($u['is_platform_admin']) || ($u['role'] ?? '') === 'adm
                || ($u['role'] ?? '') === 'global_system_administrator');
 if (!$isAdmin) { header('Location: /'); exit; }
 
-$pageTitle   = 'New insight';
+$pageTitle   = 'backstage.title.insights_new';
 $activePage  = 'insights';
 $breadcrumbs = [
     ['label' => 'Insights', 'url' => '/backstage/insights'],
@@ -48,11 +48,11 @@ ob_start();
     <?php include __DIR__ . '/../_form.php'; ?>
 </div>
 
-<link rel="stylesheet" href="/pages/backstage/shared/locale-cards.css">
+<link rel="stylesheet" href="/backstage/pages/shared/locale-cards.css">
 <link rel="stylesheet" href="/modules/insights/assets/backstage/insight-form.css">
-<script src="/pages/backstage/shared/locale-cards.js" defer></script>
+<script src="/backstage/pages/shared/locale-cards.js" defer></script>
 <script src="/modules/insights/assets/backstage/insight-form-page.js" defer></script>
 
 <?php
 $pageContent = ob_get_clean();
-require DAEMS_SITE_PUBLIC . '/pages/backstage/layout.php';
+require DAEMS_SITE_PUBLIC . '/pages/layout.php';

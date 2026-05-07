@@ -6,7 +6,7 @@ $isAdmin = $u && (!empty($u['is_platform_admin']) || ($u['role'] ?? '') === 'adm
                || ($u['role'] ?? '') === 'global_system_administrator');
 if (!$isAdmin) { header('Location: /'); exit; }
 
-$pageTitle   = 'Insights';
+$pageTitle   = 'backstage.title.insights';
 $activePage  = 'insights';
 $breadcrumbs = [];
 
@@ -75,7 +75,7 @@ ob_start();
       $body      = 'Create your first insight to share news with members.';
       $cta_label = '+ Add insight';
       $cta_href  = '/backstage/insights/new';
-      include DAEMS_SITE_PUBLIC . '/pages/backstage/shared/empty-state.php';
+      include DAEMS_SITE_PUBLIC . '/pages/shared/empty-state.php';
     ?>
   </div>
   <div id="insights-error-mount" style="display:none;"></div>
@@ -85,4 +85,4 @@ ob_start();
 
 <?php
 $pageContent = ob_get_clean();
-require DAEMS_SITE_PUBLIC . '/pages/backstage/layout.php';
+require DAEMS_SITE_PUBLIC . '/pages/layout.php';

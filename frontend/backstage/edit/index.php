@@ -1,9 +1,7 @@
 <?php
 declare(strict_types=1);
 
-if (!class_exists('ApiClient')) {
-    require_once DAEMS_SITE_PUBLIC . '/../src/ApiClient.php';
-}
+use Daems\Frontend\ApiClient;
 
 $u = $_SESSION['user'] ?? null;
 $isAdmin = $u && (!empty($u['is_platform_admin']) || ($u['role'] ?? '') === 'admin'
@@ -22,7 +20,7 @@ if ($id === '') {
 $insight = ApiClient::get('/backstage/insights/' . rawurlencode($id) . '/translations');
 if (!is_array($insight) || empty($insight)) {
     http_response_code(404);
-    require DAEMS_SITE_PUBLIC . '/pages/errors/404.php';
+    http_response_code(404); echo '<h1>Not found</h1>'; exit;
     exit;
 }
 
@@ -38,7 +36,7 @@ foreach (['fi_FI', 'en_GB', 'sw_TZ'] as $loc) {
     }
 }
 
-$pageTitle   = 'Edit insight';
+$pageTitle   = 'backstage.title.insights_edit';
 $activePage  = 'insights';
 $breadcrumbs = [
     ['label' => 'Insights', 'url' => '/backstage/insights'],
@@ -73,11 +71,11 @@ ob_start();
     <?php include __DIR__ . '/../_form.php'; ?>
 </div>
 
-<link rel="stylesheet" href="/pages/backstage/shared/locale-cards.css">
+<link rel="stylesheet" href="/backstage/pages/shared/locale-cards.css">
 <link rel="stylesheet" href="/modules/insights/assets/backstage/insight-form.css">
-<script src="/pages/backstage/shared/locale-cards.js" defer></script>
+<script src="/backstage/pages/shared/locale-cards.js" defer></script>
 <script src="/modules/insights/assets/backstage/insight-form-page.js" defer></script>
 
 <?php
 $pageContent = ob_get_clean();
-require DAEMS_SITE_PUBLIC . '/pages/backstage/layout.php';
+require DAEMS_SITE_PUBLIC . '/pages/layout.php';
